@@ -10,6 +10,7 @@ import nltk
 import re
 import numpy as np
 
+
 def window(iterable, size): # stack overflow solution for sliding window
     i = iter(iterable)
     win = []
@@ -19,6 +20,7 @@ def window(iterable, size): # stack overflow solution for sliding window
     for e in i:
         win = win[1:] + [e]
         yield win
+
 
 def _get_data_tuple(sptoks, asp_termIn, label):
     # Find the ids of aspect term
@@ -31,7 +33,6 @@ def _get_data_tuple(sptoks, asp_termIn, label):
         elif asp_term in ' '.join([g.lower() for g in group]):
             aspect_is = list(range(_i,_i+len(asp_termIn)))
             break
-
 
     print(aspect_is)
     pos_info = []
@@ -70,15 +71,17 @@ Return:
 @max_target_len: maximum target length
 
 """
+
+
 def read_data_2016(fname, source_count, source_word2idx, target_count, target_phrase2idx, file_name):
-    if os.path.isfile(fname) == False:
+    if not os.path.isfile(fname):
         raise ("[!] Data %s not found" % fname)
 
     # parse xml file to tree
     tree = ET.parse(fname)
     root = tree.getroot()
 
-    outF= open(file_name, "w")
+    outF = open(file_name, "w")
 
     # save all words in source_words (includes duplicates)
     # save all aspects in target_words (includes duplicates)
