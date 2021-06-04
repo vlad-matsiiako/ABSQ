@@ -3,13 +3,13 @@
 # https://github.com/pcgreat/mem_absa
 # https://github.com/NUSTM/ABSC
 
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
 import cabascModel
 import lcrModel
 import lcrModelInverse
 import lcrModelAlt
 import svmModel
-from OntologyReasoner import OntReasoner
+# from OntologyReasoner  import OntReasoner
 from loadData import *
 
 #import parameter configuration and data paths
@@ -28,7 +28,7 @@ import lcrModelAlt_hierarchical_v4
 def main(_):
     loadData         = False        # only for non-contextualised word embeddings.
                                     #   Use prepareBERT for BERT (and BERT_Large) and prepareELMo for ELMo
-    useOntology      = True         # When run together with runLCRROTALT, the two-step method is used
+    useOntology      = False         # When run together with runLCRROTALT, the two-step method is used
     runLCRROTALT     = False
 
     runSVM           = False
@@ -37,10 +37,10 @@ def main(_):
     runLCRROTINVERSE = False
     weightanalysis   = False
 
-    runLCRROTALT_v1     = True
+    runLCRROTALT_v1     = False
     runLCRROTALT_v2     = False
     runLCRROTALT_v3     = False
-    runLCRROTALT_v4     = False
+    runLCRROTALT_v4     = True
 
     #determine if backupmethod is used
     if runCABASC or runLCRROT or runLCRROTALT or runLCRROTINVERSE or runSVM or runLCRROTALT_v1 or runLCRROTALT_v2 or runLCRROTALT_v3 or runLCRROTALT_v4:
@@ -54,30 +54,29 @@ def main(_):
     remaining_size = 250
     accuracyOnt = 0.87
 
-    if useOntology == True:
-        print('Starting Ontology Reasoner')
-        #in sample accuracy
-        Ontology = OntReasoner()
-        accuracyOnt, remaining_size = Ontology.run(backup,FLAGS.test_path_ont, runSVM)
-        #out of sample accuracy
-        #Ontology = OntReasoner()      
-        #accuracyInSampleOnt, remainingInSample_size = Ontology.run(backup,FLAGS.train_path_ont, runSVM)        
-        if runSVM == True:
-            test = FLAGS.remaining_svm_test_path
-        else:
-            test = FLAGS.remaining_test_path
-            print(test[0])
-        print('train acc = {:.4f}, test acc={:.4f}, remaining size={}'.format(accuracyOnt, accuracyOnt, remaining_size))
+    # if useOntology == True:
+    #     print('Starting Ontology Reasoner')
+    #     #in sample accuracy
+    #     Ontology = OntReasoner()
+    #     accuracyOnt, remaining_size = Ontology.run(backup,FLAGS.test_path_ont, runSVM)
+    #     #out of sample accuracy
+    #     #Ontology = OntReasoner()
+    #     #accuracyInSampleOnt, remainingInSample_size = Ontology.run(backup,FLAGS.train_path_ont, runSVM)
+    #     if runSVM == True:
+    #         test = FLAGS.remaining_svm_test_path
+    #     else:
+    #         test = FLAGS.remaining_test_path
+    #         print(test[0])
+    #     print('train acc = {:.4f}, test acc={:.4f}, remaining size={}'.format(accuracyOnt, accuracyOnt, remaining_size))
+    # else:
+    if runSVM == True:
+        test = FLAGS.test_svm_path
     else:
-        if runSVM == True:
-            test = FLAGS.test_svm_path
-        else:
-            test = FLAGS.test_path
+        test = FLAGS.test_path
 
     # LCR-Rot-hop model
     if runLCRROTALT == True:
-       _, pred2, fw2, bw2, tl2, tr2 = lcrModelAlt.main(FLAGS.train_path, test, accuracyOnt, test_size,
-                                                        remaining_size)
+       _, pred2, fw2, bw2, tl2, tr2 = lcrModelAlt.main(FLAGS.train_path, test, accuracyOnt, test_size, remaining_size)
        tf.reset_default_graph()
 
     if runLCRROTALT_v1 == True:
