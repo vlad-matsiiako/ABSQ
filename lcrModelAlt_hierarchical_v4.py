@@ -86,6 +86,10 @@ def lcr_rot(input_fw, input_bw, sen_len_fw, sen_len_bw, target, sen_len_tr, keep
         outputs_r = tf.squeeze(tf.matmul(tf.expand_dims(att_outputs_target[:,:,1], 2), outputs_r_init))
         outputs_t_l = tf.squeeze(tf.matmul(tf.expand_dims(att_outputs_context[:,:,0], 2), outputs_t_l_init))
         outputs_t_r = tf.squeeze(tf.matmul(tf.expand_dims(att_outputs_context[:,:,1], 2), outputs_t_r_init))
+        print(outputs_l)
+
+
+    #     Save them somewhere here
 
     outputs_fin = tf.concat([outputs_l, outputs_r, outputs_t_l, outputs_t_r], 1)
     prob = softmax_layer(outputs_fin, 8 * FLAGS.n_hidden, FLAGS.random_base, keep_prob2, l2, FLAGS.n_class)
@@ -196,19 +200,87 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
         max_fw, max_bw = None, None
         max_tl, max_tr = None, None
         max_ty, max_py = None, None
+        # outputs_l = None
         max_prob = None
         step = None
         for i in range(FLAGS.n_iter):
             trainacc, traincnt = 0., 0
+            ty_train = []
+            py_train = []
+            prob_train = np.array([], dtype=np.float32).reshape(0,3)
             for train, numtrain in get_batch_data(tr_x, tr_sen_len, tr_x_bw, tr_sen_len_bw, tr_y, tr_target_word, tr_tar_len,
                                            FLAGS.batch_size, keep_prob, keep_prob):
                 # _, step = sess.run([optimizer, global_step], feed_dict=train)
-                _, step, summary, _trainacc = sess.run([optimizer, global_step, train_summary_op, acc_num], feed_dict=train)
+                _, step, summary, _trainacc, _ty_train, _py_train, _prob_train = sess.run([optimizer, global_step, train_summary_op, acc_num, true_y, pred_y, prob], feed_dict=train)
                 train_summary_writer.add_summary(summary, step)
                 # embed_update = tf.assign(word_embedding, tf.concat(0, [tf.zeros([1, FLAGS.embedding_dim]), word_embedding[1:]]))
                 # sess.run(embed_update)
+                # print(_prob_train)
+                if i == FLAGS.n_iter - 1:
+                    ty_train = np.concatenate([ty_train, _ty_train])
+                    py_train = np.concatenate([py_train, _py_train])
+                    prob_train = np.append(prob_train, _prob_train, axis=0)
                 trainacc += _trainacc            # saver.save(sess, save_dir, global_step=step)
                 traincnt += numtrain
+            ty_train = np.asarray(ty_train)
+            py_train = np.asarray(py_train)
+            prob_train = np.asarray(prob_train)
+            # outputs_l_train = np.asarray(outputs_l)
+
+            cc_p1, cc_p2, cc_p3, cc_f12, cc_f13, cc_f21, cc_f23, cc_f31, cc_f32 = 0, 0, 0, 0, 0, 0, 0, 0, 0
+            pcc_p1, pcc_p2, pcc_p3, pcc_f12, pcc_f13, pcc_f21, pcc_f23, pcc_f31, pcc_f32 = 0, 0, 0, 0, 0, 0, 0, 0, 0
+            for index in range(len(ty_train)):
+                if ty_train[index] == 0 and py_train[index] == 0:
+                    cc_p1 += 1
+                if ty_train[index] == 0 and py_train[index] == 1:
+                    cc_f21 += 1
+                if ty_train[index] == 0 and py_train[index] == 2:
+                    cc_f31 += 1
+                if ty_train[index] == 1 and py_train[index] == 0:
+                    cc_f12 += 1
+                if ty_train[index] == 1 and py_train[index] == 1:
+                    cc_p2 += 1
+                if ty_train[index] == 1 and py_train[index] == 2:
+                    cc_f32 += 1
+                if ty_train[index] == 2 and py_train[index] == 0:
+                    cc_f13 += 1
+                if ty_train[index] == 2 and py_train[index] == 1:
+                    cc_f23 += 1
+                if ty_train[index] == 2 and py_train[index] == 2:
+                    cc_p3 += 1
+            for index in range(len(ty_train)):
+                if ty_train[index] == 0:
+                    pcc_p1 += prob_train[index][0]
+                    pcc_f21 += prob_train[index][1]
+                    pcc_f31 += prob_train[index][2]
+                if ty_train[index] == 1:
+                    pcc_f12 += prob_train[index][0]
+                    pcc_p2 += prob_train[index][1]
+                    pcc_f32 += prob_train[index][2]
+                if ty_train[index] == 2:
+                    pcc_f13 += prob_train[index][0]
+                    pcc_f23 += prob_train[index][1]
+                    pcc_p3 += prob_train[index][2]
+
+            CC_T1 = (cc_p1) / (cc_p1 + cc_f21 + cc_f31 + 0.0001)
+            CC_T2 = (cc_p2) / (cc_p2 + cc_f12 + cc_f32 + 0.0001)
+            CC_T3 = (cc_p3) / (cc_p3 + cc_f23 + cc_f23 + 0.0001)
+            CC_F12 = (cc_f12) / (cc_f12 + cc_p2 + cc_f32 + 0.0001)
+            CC_F13 = (cc_f13) / (cc_f13 + cc_f23 + cc_p3 + 0.0001)
+            CC_F21 = (cc_f21) / (cc_p1 + cc_f21 + cc_f31 + 0.0001)
+            CC_F23 = (cc_f23) / (cc_f13 + cc_f23 + cc_p3 + 0.0001)
+            CC_F31 = (cc_f31) / (cc_p1 + cc_f21 + cc_f31 + 0.0001)
+            CC_F32 = (cc_f32) / (cc_f12 + cc_p2 + cc_f32 + 0.0001)
+
+            PCC_T1 = (pcc_p1) / (pcc_p1 + pcc_f21 + pcc_f31 + 0.0001)
+            PCC_T2 = (pcc_p2) / (pcc_p2 + pcc_f12 + pcc_f32 + 0.0001)
+            PCC_T3 = (pcc_p3) / (pcc_p3 + pcc_f23 + pcc_f23 + 0.0001)
+            PCC_F12 = (pcc_f12) / (pcc_f12 + pcc_p2 + pcc_f32 + 0.0001)
+            PCC_F13 = (pcc_f13) / (pcc_f13 + pcc_f23 + pcc_p3 + 0.0001)
+            PCC_F21 = (pcc_f21) / (pcc_p1 + pcc_f21 + pcc_f31 + 0.0001)
+            PCC_F23 = (pcc_f23) / (pcc_f13 + pcc_f23 + pcc_p3 + 0.0001)
+            PCC_F31 = (pcc_f31) / (pcc_p1 + pcc_f21 + pcc_f31 + 0.0001)
+            PCC_F32 = (pcc_f32) / (pcc_f12 + pcc_p2 + pcc_f32 + 0.0001)
 
             acc, cost, cnt = 0., 0., 0
             fw, bw, tl, tr, ty, py = [], [], [], [], [], []
@@ -251,6 +323,42 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
                 max_ty = ty
                 max_py = py
                 max_prob = p
+
+        CC_count1, CC_count2, CC_count3 = 0, 0, 0
+        # CC
+        for i in range(len(max_prob)):
+            if (np.argmax(max_prob[i])) == 0:
+                CC_count1 += 1
+            if (np.argmax(max_prob[i])) == 1:
+                CC_count2 += 1
+            if (np.argmax(max_prob[i])) == 2:
+                CC_count3 += 1
+        PCC_count1, PCC_count2, PCC_count3 = 0, 0, 0
+        # PCC
+        for i in range(len(max_prob)):
+            PCC_count1 += max_prob[i][0]
+            PCC_count2 += max_prob[i][1]
+            PCC_count3 += max_prob[i][2]
+
+        CC_share1 = CC_count1 / (CC_count1 + CC_count2 + CC_count3)
+        CC_share2 = CC_count2 / (CC_count1 + CC_count2 + CC_count3)
+        CC_share3 = CC_count3 / (CC_count1 + CC_count2 + CC_count3)
+
+        PCC_share1 = PCC_count1 / (PCC_count1 + PCC_count2 + PCC_count3)
+        PCC_share2 = PCC_count2 / (PCC_count1 + PCC_count2 + PCC_count3)
+        PCC_share3 = PCC_count3 / (PCC_count1 + PCC_count2 + PCC_count3)
+
+        ACC_share1 = (CC_share1 - ((CC_F12 - CC_F13)*(CC_share2 - CC_F23))/(CC_T2-CC_F23) - CC_F13)/\
+                     (CC_T1 - ((CC_F12 - CC_F13)*(CC_F21 - CC_F23))/(CC_T2 - CC_F23) - CC_F13)
+        ACC_share2 = (CC_share2 - ((CC_F21 - CC_F23) * (CC_share1 - CC_F13)) / (CC_T1 - CC_F13) - CC_F23) / \
+                    (CC_T2 - ((CC_F21 - CC_F23) * (CC_F12 - CC_F13)) / (CC_T1 - CC_F13) - CC_F23)
+        ACC_share3 = 1 - ACC_share1 - ACC_share2
+
+        PACC_share1 = (PCC_share1 - ((PCC_F12 - PCC_F13) * (PCC_share2 - PCC_F23)) / (PCC_T2 - PCC_F23) - PCC_F13) / \
+                     (PCC_T1 - ((PCC_F12 - PCC_F13) * (PCC_F21 - PCC_F23)) / (PCC_T2 - PCC_F23) - PCC_F13)
+        PACC_share2 = (PCC_share2 - ((PCC_F21 - PCC_F23) * (PCC_share1 - PCC_F13)) / (PCC_T1 - PCC_F13) - PCC_F23) / \
+                     (PCC_T2 - ((PCC_F21 - PCC_F23) * (PCC_F12 - PCC_F13)) / (PCC_T1 - PCC_F13) - PCC_F23)
+        PACC_share3 = 1 - PACC_share1 - PACC_share2
 
         P = precision_score(max_ty, max_py, average=None)
         R = recall_score(max_ty, max_py, average=None)
