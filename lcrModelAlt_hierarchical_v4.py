@@ -86,14 +86,10 @@ def lcr_rot(input_fw, input_bw, sen_len_fw, sen_len_bw, target, sen_len_tr, keep
         outputs_r = tf.squeeze(tf.matmul(tf.expand_dims(att_outputs_target[:,:,1], 2), outputs_r_init))
         outputs_t_l = tf.squeeze(tf.matmul(tf.expand_dims(att_outputs_context[:,:,0], 2), outputs_t_l_init))
         outputs_t_r = tf.squeeze(tf.matmul(tf.expand_dims(att_outputs_context[:,:,1], 2), outputs_t_r_init))
-        print(outputs_l)
-
-
-    #     Save them somewhere here
 
     outputs_fin = tf.concat([outputs_l, outputs_r, outputs_t_l, outputs_t_r], 1)
     prob = softmax_layer(outputs_fin, 8 * FLAGS.n_hidden, FLAGS.random_base, keep_prob2, l2, FLAGS.n_class)
-    return prob, att_l, att_r, att_t_l, att_t_r
+    return prob, att_l, att_r, att_t_l, att_t_r, outputs_fin
 
 def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning_rate=0.09, keep_prob=0.3, momentum=0.85, l2=0.00001):
     print_config()
@@ -120,7 +116,8 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
         target = tf.nn.embedding_lookup(word_embedding, target_words)
 
         alpha_fw, alpha_bw = None, None
-        prob, alpha_fw, alpha_bw, alpha_t_l, alpha_t_r = lcr_rot(inputs_fw, inputs_bw, sen_len, sen_len_bw, target, tar_len, keep_prob1, keep_prob2, l2, 'all')
+        outputs_fin = None
+        prob, alpha_fw, alpha_bw, alpha_t_l, alpha_t_r, outputs_fin = lcr_rot(inputs_fw, inputs_bw, sen_len, sen_len_bw, target, tar_len, keep_prob1, keep_prob2, l2, 'all')
 
         loss = loss_func(y, prob)
         acc_num, acc_prob = acc_func(y, prob)
@@ -200,6 +197,7 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
         max_fw, max_bw = None, None
         max_tl, max_tr = None, None
         max_ty, max_py = None, None
+        max_outputs_fin, max_outputs_fin_train = None, None
         # outputs_l = None
         max_prob = None
         step = None
@@ -207,25 +205,27 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
             trainacc, traincnt = 0., 0
             ty_train = []
             py_train = []
+            outputs_final_train = np.array([], dtype=np.float32).reshape(0,2400)
             prob_train = np.array([], dtype=np.float32).reshape(0,3)
-            for train, numtrain in get_batch_data(tr_x, tr_sen_len, tr_x_bw, tr_sen_len_bw, tr_y, tr_target_word, tr_tar_len,
-                                           FLAGS.batch_size, keep_prob, keep_prob):
+            for train, numtrain in get_batch_data(tr_x, tr_sen_len, tr_x_bw, tr_sen_len_bw, tr_y, tr_target_word, tr_tar_len, FLAGS.batch_size, keep_prob, keep_prob):
                 # _, step = sess.run([optimizer, global_step], feed_dict=train)
-                _, step, summary, _trainacc, _ty_train, _py_train, _prob_train = sess.run([optimizer, global_step, train_summary_op, acc_num, true_y, pred_y, prob], feed_dict=train)
+                _, step, summary, _trainacc, _ty_train, _py_train, _prob_train, _outputs_fin = sess.run([optimizer, global_step, train_summary_op, acc_num, true_y, pred_y, prob, outputs_fin], feed_dict=train)
                 train_summary_writer.add_summary(summary, step)
                 # embed_update = tf.assign(word_embedding, tf.concat(0, [tf.zeros([1, FLAGS.embedding_dim]), word_embedding[1:]]))
                 # sess.run(embed_update)
                 # print(_prob_train)
-                if i == FLAGS.n_iter - 1:
-                    ty_train = np.concatenate([ty_train, _ty_train])
-                    py_train = np.concatenate([py_train, _py_train])
-                    prob_train = np.append(prob_train, _prob_train, axis=0)
+                # if i == FLAGS.n_iter - 1:
+
+                ty_train = np.concatenate([ty_train, _ty_train])
+                py_train = np.concatenate([py_train, _py_train])
+                prob_train = np.append(prob_train, _prob_train, axis=0)
+                outputs_final_train = np.append(outputs_final_train, _outputs_fin, axis=0)
                 trainacc += _trainacc            # saver.save(sess, save_dir, global_step=step)
                 traincnt += numtrain
             ty_train = np.asarray(ty_train)
             py_train = np.asarray(py_train)
             prob_train = np.asarray(prob_train)
-            # outputs_l_train = np.asarray(outputs_l)
+            outputs_final_train = np.asarray(outputs_final_train)
 
             cc_p1, cc_p2, cc_p3, cc_f12, cc_f13, cc_f21, cc_f23, cc_f31, cc_f32 = 0, 0, 0, 0, 0, 0, 0, 0, 0
             pcc_p1, pcc_p2, pcc_p3, pcc_f12, pcc_f13, pcc_f21, pcc_f23, pcc_f31, pcc_f32 = 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -288,14 +288,15 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
             for test, num in get_batch_data(te_x, te_sen_len, te_x_bw, te_sen_len_bw, te_y,
                                             te_target_word, te_tar_len, 2000, 1.0, 1.0, False):
                 if FLAGS.method == 'TD-ATT' or FLAGS.method == 'IAN':
-                    _loss, _acc, _fw, _bw, _tl, _tr, _ty, _py, _p = sess.run(
-                        [loss, acc_num, alpha_fw, alpha_bw, alpha_t_l, alpha_t_r, true_y, pred_y, prob], feed_dict=test)
+                    _loss, _acc, _fw, _bw, _tl, _tr, _ty, _py, _p, _outputs_fin = sess.run(
+                        [loss, acc_num, alpha_fw, alpha_bw, alpha_t_l, alpha_t_r, true_y, pred_y, prob, outputs_fin], feed_dict=test)
                     fw += list(_fw)
                     bw += list(_bw)
                     tl += list(_tl)
                     tr += list(_tr)
+
                 else:
-                    _loss, _acc, _ty, _py, _p, _fw, _bw, _tl, _tr = sess.run([loss, acc_num, true_y, pred_y, prob, alpha_fw, alpha_bw, alpha_t_l, alpha_t_r], feed_dict=test)
+                    _loss, _acc, _ty, _py, _p, _fw, _bw, _tl, _tr, _outputs_fin = sess.run([loss, acc_num, true_y, pred_y, prob, alpha_fw, alpha_bw, alpha_t_l, alpha_t_r, outputs_fin], feed_dict=test)
                 ty = np.asarray(_ty)
                 py = np.asarray(_py)
                 p = np.asarray(_p)
@@ -303,6 +304,7 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
                 bw = np.asarray(_bw)
                 tl = np.asarray(_tl)
                 tr = np.asarray(_tr)
+                outputs_final = np.asarray(_outputs_fin)
                 acc += _acc
                 cost += _loss * num
                 cnt += num
@@ -322,7 +324,12 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
                 max_tr = tr
                 max_ty = ty
                 max_py = py
+                max_ty_train = ty_train
+                max_py_train = py_train
                 max_prob = p
+                max_prob_train = prob_train
+                max_outputs_fin = outputs_final
+                max_outputs_fin_train = outputs_final_train
 
         CC_count1, CC_count2, CC_count3 = 0, 0, 0
         # CC
@@ -382,6 +389,14 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
         fp = open(FLAGS.prob_file + '_tr', 'w')
         for y1, y2, ws in zip(max_ty, max_py, max_tr):
             fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(w) for w in ws[0]]) + '\n')
+
+        fp = open(FLAGS.prob_file + '_outputs_fin_test', 'w')
+        for y1, y2, probs, ws in zip(max_ty, max_py, max_prob, max_outputs_fin):
+            fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(prob) for prob in probs]) + ' ' + ' '.join([str(w) for w in ws]) + '\n')
+
+        fp = open(FLAGS.prob_file + '_outputs_fin_train', 'w')
+        for y1, y2, probs, ws in zip(max_ty_train, max_py_train, max_prob_train, max_outputs_fin_train):
+            fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(prob) for prob in probs]) + ' ' + ' '.join([str(w) for w in ws]) + '\n')
 
         print('Optimization Finished! Max acc={}'.format(max_acc))
 
