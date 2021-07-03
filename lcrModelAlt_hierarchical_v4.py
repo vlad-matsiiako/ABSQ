@@ -331,42 +331,6 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
                 max_outputs_fin = outputs_final
                 max_outputs_fin_train = outputs_final_train
 
-        CC_count1, CC_count2, CC_count3 = 0, 0, 0
-        # CC
-        for i in range(len(max_prob)):
-            if (np.argmax(max_prob[i])) == 0:
-                CC_count1 += 1
-            if (np.argmax(max_prob[i])) == 1:
-                CC_count2 += 1
-            if (np.argmax(max_prob[i])) == 2:
-                CC_count3 += 1
-        PCC_count1, PCC_count2, PCC_count3 = 0, 0, 0
-        # PCC
-        for i in range(len(max_prob)):
-            PCC_count1 += max_prob[i][0]
-            PCC_count2 += max_prob[i][1]
-            PCC_count3 += max_prob[i][2]
-
-        CC_share1 = CC_count1 / (CC_count1 + CC_count2 + CC_count3)
-        CC_share2 = CC_count2 / (CC_count1 + CC_count2 + CC_count3)
-        CC_share3 = CC_count3 / (CC_count1 + CC_count2 + CC_count3)
-
-        PCC_share1 = PCC_count1 / (PCC_count1 + PCC_count2 + PCC_count3)
-        PCC_share2 = PCC_count2 / (PCC_count1 + PCC_count2 + PCC_count3)
-        PCC_share3 = PCC_count3 / (PCC_count1 + PCC_count2 + PCC_count3)
-
-        ACC_share1 = (CC_share1 - ((CC_F12 - CC_F13)*(CC_share2 - CC_F23))/(CC_T2-CC_F23) - CC_F13)/\
-                     (CC_T1 - ((CC_F12 - CC_F13)*(CC_F21 - CC_F23))/(CC_T2 - CC_F23) - CC_F13)
-        ACC_share2 = (CC_share2 - ((CC_F21 - CC_F23) * (CC_share1 - CC_F13)) / (CC_T1 - CC_F13) - CC_F23) / \
-                    (CC_T2 - ((CC_F21 - CC_F23) * (CC_F12 - CC_F13)) / (CC_T1 - CC_F13) - CC_F23)
-        ACC_share3 = 1 - ACC_share1 - ACC_share2
-
-        PACC_share1 = (PCC_share1 - ((PCC_F12 - PCC_F13) * (PCC_share2 - PCC_F23)) / (PCC_T2 - PCC_F23) - PCC_F13) / \
-                     (PCC_T1 - ((PCC_F12 - PCC_F13) * (PCC_F21 - PCC_F23)) / (PCC_T2 - PCC_F23) - PCC_F13)
-        PACC_share2 = (PCC_share2 - ((PCC_F21 - PCC_F23) * (PCC_share1 - PCC_F13)) / (PCC_T1 - PCC_F13) - PCC_F23) / \
-                     (PCC_T2 - ((PCC_F21 - PCC_F23) * (PCC_F12 - PCC_F13)) / (PCC_T1 - PCC_F13) - PCC_F23)
-        PACC_share3 = 1 - PACC_share1 - PACC_share2
-
         P = precision_score(max_ty, max_py, average=None)
         R = recall_score(max_ty, max_py, average=None)
         F1 = f1_score(max_ty, max_py, average=None)
@@ -377,24 +341,24 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
         fp = open(FLAGS.prob_file, 'w')
         for item in max_prob:
             fp.write(' '.join([str(it) for it in item]) + '\n')
-        fp = open(FLAGS.prob_file + '_fw', 'w')
+        fp = open(FLAGS.prob_file + '_fw_ambience', 'w')
         for y1, y2, ws in zip(max_ty, max_py, max_fw):
             fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(w) for w in ws[0]]) + '\n')
-        fp = open(FLAGS.prob_file + '_bw', 'w')
+        fp = open(FLAGS.prob_file + '_bw_ambience', 'w')
         for y1, y2, ws in zip(max_ty, max_py, max_bw):
             fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(w) for w in ws[0]]) + '\n')
-        fp = open(FLAGS.prob_file + '_tl', 'w')
+        fp = open(FLAGS.prob_file + '_tl_ambience', 'w')
         for y1, y2, ws in zip(max_ty, max_py, max_tl):
             fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(w) for w in ws[0]]) + '\n')
-        fp = open(FLAGS.prob_file + '_tr', 'w')
+        fp = open(FLAGS.prob_file + '_tr_ambience', 'w')
         for y1, y2, ws in zip(max_ty, max_py, max_tr):
             fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(w) for w in ws[0]]) + '\n')
 
-        fp = open(FLAGS.prob_file + '_outputs_fin_test', 'w')
+        fp = open(FLAGS.prob_file + '_outputs_fin_test_ambience', 'w')
         for y1, y2, probs, ws in zip(max_ty, max_py, max_prob, max_outputs_fin):
             fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(prob) for prob in probs]) + ' ' + ' '.join([str(w) for w in ws]) + '\n')
 
-        fp = open(FLAGS.prob_file + '_outputs_fin_train', 'w')
+        fp = open(FLAGS.prob_file + '_outputs_fin_train_ambience', 'w')
         for y1, y2, probs, ws in zip(max_ty_train, max_py_train, max_prob_train, max_outputs_fin_train):
             fp.write(str(y1) + ' ' + str(y2) + ' ' + ' '.join([str(prob) for prob in probs]) + ' ' + ' '.join([str(w) for w in ws]) + '\n')
 
