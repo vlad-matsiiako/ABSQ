@@ -1,5 +1,5 @@
 # HAABSA + Quantification
-This is the repository that I will be using to store the code used in my thesis
+This is the repository for replicating the fidngings from ABSQ 2021 paper. 
 
 # HAABSA++
 The code for A Hybrid Approach for Aspect-Based Sentiment Analysis Using Contextual Word Emmbeddings and Hierarchical Attention
