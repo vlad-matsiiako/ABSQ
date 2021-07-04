@@ -227,6 +227,7 @@ def main(train_path, test_path, accuracyOnt, test_size, remaining_size, learning
             prob_train = np.asarray(prob_train)
             outputs_final_train = np.asarray(outputs_final_train)
 
+            # calculate quantification predictions (for udnerstanding)
             cc_p1, cc_p2, cc_p3, cc_f12, cc_f13, cc_f21, cc_f23, cc_f31, cc_f32 = 0, 0, 0, 0, 0, 0, 0, 0, 0
             pcc_p1, pcc_p2, pcc_p3, pcc_f12, pcc_f13, pcc_f21, pcc_f23, pcc_f31, pcc_f32 = 0, 0, 0, 0, 0, 0, 0, 0, 0
             for index in range(len(ty_train)):
