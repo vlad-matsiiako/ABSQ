@@ -621,11 +621,13 @@ def load_inputs_full(input_file, word_id_file, sentence_len, type_='', is_r=True
 
 
 def calculate_classifications(ty_train, py_train, prob_train):
+    # Convert to the correct format
     ty_train = np.asarray(ty_train)
     py_train = np.asarray(py_train)
     prob_train = np.asarray(prob_train)
     cc_p1, cc_p2, cc_p3, cc_f12, cc_f13, cc_f21, cc_f23, cc_f31, cc_f32 = 0, 0, 0, 0, 0, 0, 0, 0, 0
     pcc_p1, pcc_p2, pcc_p3, pcc_f12, pcc_f13, pcc_f21, pcc_f23, pcc_f31, pcc_f32 = 0, 0, 0, 0, 0, 0, 0, 0, 0
+    # increase the counts when needed
     for index in range(len(ty_train)):
         if ty_train[index] == 0 and py_train[index] == 0:
             cc_p1 += 1
@@ -645,6 +647,7 @@ def calculate_classifications(ty_train, py_train, prob_train):
             cc_f23 += 1
         if ty_train[index] == 2 and py_train[index] == 2:
             cc_p3 += 1
+    # also for probabilistic
     for index in range(len(ty_train)):
         if ty_train[index] == 0:
             pcc_p1 += prob_train[index][0]
@@ -659,6 +662,7 @@ def calculate_classifications(ty_train, py_train, prob_train):
             pcc_f23 += prob_train[index][1]
             pcc_p3 += prob_train[index][2]
 
+    # calculate the true/false preediction rates
     CC_T1 = (cc_p1) / (cc_p1 + cc_f21 + cc_f31 + 0.0001)
     CC_T2 = (cc_p2) / (cc_p2 + cc_f12 + cc_f32 + 0.0001)
     CC_T3 = (cc_p3) / (cc_p3 + cc_f23 + cc_f23 + 0.0001)
@@ -716,6 +720,7 @@ def calculate_classifications(ty_train, py_train, prob_train):
         PCC_count2 += prob_train[i][1]
         PCC_count3 += prob_train[i][2]
 
+    # calculate quantifications for each of the methods
     CC_share1 = CC_count1 / (CC_count1 + CC_count2 + CC_count3)
     CC_share2 = CC_count2 / (CC_count1 + CC_count2 + CC_count3)
     CC_share3 = CC_count3 / (CC_count1 + CC_count2 + CC_count3)
