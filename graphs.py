@@ -6,7 +6,7 @@ matplotlib.use('TkAgg')
 
 SIZE = (8, 2.5)
 
-
+# First calculate the graph for kld/mae
 df = pd.read_csv('/Users/vmatsiiako/Desktop/Erasmus/Thesis/Code/training.txt', ", ")
 df_test = pd.read_csv('/Users/vmatsiiako/Desktop/Erasmus/Thesis/Code/prob1.txt_outputs_fin_test_service', delimiter=" ", header=None)
 
@@ -19,16 +19,19 @@ plt.grid(True)
 plt.legend(loc='best')
 plt.show()
 
-df_food_test_neutral = df_test[df_test[0] == 2].sample(n=50, replace=True, random_state=1)
-df_food_test_negative = df_test[df_test[0] == 1].sample(n=50, replace=True, random_state=1)
-df_food_test_positive = df_test[df_test[0] == 0].sample(n=50, random_state=1)
 
-df_test = pd.concat([df_food_test_positive, df_food_test_negative, df_food_test_neutral])
+# adjust the relative true prevalences if needed
+# df_food_test_neutral = df_test[df_test[0] == 2].sample(n=50, replace=True, random_state=1)
+# df_food_test_negative = df_test[df_test[0] == 1].sample(n=50, replace=True, random_state=1)
+# df_food_test_positive = df_test[df_test[0] == 0].sample(n=50, random_state=1)
+#
+# df_test = pd.concat([df_food_test_positive, df_food_test_negative, df_food_test_neutral])
 
-
+# add entropy
 df_test[2405] = df_test[2] * np.log(df_test[2]) + df_test[3] * np.log(df_test[3]) + df_test[4] * np.log(df_test[4])
 df_test = df_test.sort_values(by=[2405]).reset_index(drop=True)
 
+# add the graph for true sentiment classes
 data = pd.DataFrame()
 data['index'] = df_test.index
 data['0'] = df_test[2]
