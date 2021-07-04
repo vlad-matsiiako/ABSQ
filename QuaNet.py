@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers, Sequential
+from tensorflow.keras import layers
 from utils import calculate_classifications
 
 
@@ -21,16 +21,21 @@ df_categories_test = pd.read_csv('/Users/vmatsiiako/Desktop/Erasmus/Thesis/Code/
 df_test = df_test[df_categories_test["Category"] == "RESTAURANT#GENERAL"].reset_index(drop=True)
 
 
+# generate the training dataset
 data = []
 quantifications = []
 additional_data = []
 for i in range(DATASET_NUMBER):
+    # set th seed
     np.random.seed(i)
     data.append(np.array(df_train.sample(n=PADDING_SIZE-1, replace=True, random_state=i).append(df_train[df_train[0]==2].sample(n=1, random_state=i)).reset_index(drop=True)))
+    # add additional data (quantification predictions by other methods etc)
     additional_data.append(calculate_classifications(data[i][:, 0], data[i][:, 1], data[i][:, np.r_[2:5]]))
+    # calculate the true quantifications
     length = len(data[i])
     quantifications.append([np.count_nonzero(data[i][:, 0] == 0) / length, np.count_nonzero(data[i][:, 0] == 1) / length, np.count_nonzero(data[i][:, 0] == 2) / length])
     data[i] = data[i][:, np.r_[2:2405]]
+    # Add entropy
     data[i] = np.c_[data[i], - data[i][:, 0]*np.log(data[i][:, 0]) - data[i][:, 1]*np.log(data[i][:, 1]) - data[i][:, 2]*np.log(data[i][:, 2])]
     # Choose depending on what you want to sort: 0 - probability, 2403 - entropy
     data[i] = data[i][data[i][:, 2403].argsort()]
@@ -42,7 +47,7 @@ data = np.asarray(data)
 additional_data = np.asarray(additional_data)
 quantifications = np.asarray(quantifications)
 
-
+# generate the test dataset, everything is similar to training dataset
 test_data = []
 test_quantifications = []
 test_additional_data = []
@@ -52,7 +57,6 @@ for i in range(TEST_DATASET_NUMBER):
     test_additional_data.append(np.asarray(calculate_classifications(test_data[i][:, 0], test_data[i][:, 1], test_data[i][:, np.r_[2:5]])))
     length = len(test_data[i])
     test_quantifications.append([np.count_nonzero(test_data[i][:, 0] == 0) / length, np.count_nonzero(test_data[i][:, 0] == 1) / length, np.count_nonzero(test_data[i][:, 0] == 2) / length])
-    # data[i] = np.pad(data[i], ((0, PADDING_SIZE + MIN_SIZE - length), (0, 0)))
     test_data[i] = test_data[i][:, np.r_[2:2405]]
     test_data[i] = np.c_[test_data[i], - test_data[i][:, 0]*np.log(test_data[i][:, 0]) - test_data[i][:, 1]*np.log(test_data[i][:, 1]) - test_data[i][:, 2]*np.log(test_data[i][:, 2])]
     # Choose depending on what you want to sort: 0 - probability, 2403 - entropy
@@ -64,12 +68,12 @@ test_data = np.asarray(test_data)
 test_additional_data = np.asarray(test_additional_data)
 test_quantifications = np.asarray(test_quantifications)
 
-# Input for variable-length sequences of integers
+# Assign inputs
 inputs = keras.Input(shape=(PADDING_SIZE + MIN_SIZE, 2404), dtype="float32")
 additional_inputs = keras.Input(shape=21, dtype="float32")
-# Add a bidirectional LSTM
+# Add a bidirectional LSTM layer
 x = tf.keras.layers.Concatenate(axis=1)([layers.Bidirectional(layers.LSTM(128, return_sequences=False, input_shape=(PADDING_SIZE + MIN_SIZE, 2404)))(inputs), additional_inputs])
-# Add dense layers
+# Add 3/4 dense layers with dropout
 layer1 = layers.Dense(512, activation="relu", name="layer1")(x)
 dropout1 = layers.Dropout(0.3)(layer1)
 layer2 = layers.Dense(256, activation="relu", name="layer2")(x)
@@ -78,11 +82,13 @@ layer3 = layers.Dense(128, name="layer3")(dropout2)
 dropout3 = layers.Dropout(0.3)(layer3)
 layer4 = layers.Dense(64, name="layer4")(dropout3)
 dropout4 = layers.Dropout(0.3)(layer4)
-# Add a classifier
+# Add a ternary classifier
 outputs = layers.Dense(3, activation="softmax")(dropout4)
 model = keras.Model([inputs, additional_inputs], outputs)
 model.summary()
 
+# compile and train the model
 model.compile("adam", "mean_absolute_error", metrics=["accuracy", "mean_absolute_error", "kullback_leibler_divergence"])
 model.fit([data, additional_data], quantifications, batch_size=BATCH_SIZE, epochs=NUM_OF_EPOCHS, validation_data=([test_data, test_additional_data], test_quantifications))
+# save the model
 model.save(f'service_padding{str(PADDING_SIZE)}_correct_2016_epoch{str(NUM_OF_EPOCHS)}_entropy_{str(DATASET_NUMBER)}_4layers_batch{str(BATCH_SIZE)}_last')
