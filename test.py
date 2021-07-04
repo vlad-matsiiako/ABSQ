@@ -6,9 +6,6 @@ from utils import calculate_classifications
 
 DATASET_NUMBER = 100
 PADDING_SIZE = 60
-BATCH_SIZE = 32
-NUM_OF_EPOCHS = 10
-MIN_SIZE = 0
 
 
 df_test = pd.read_csv('/Users/vmatsiiako/Desktop/Erasmus/Thesis/Code/prob1.txt_outputs_fin_test_service', delimiter=" ", header=None)
@@ -17,6 +14,7 @@ df_test = pd.read_csv('/Users/vmatsiiako/Desktop/Erasmus/Thesis/Code/prob1.txt_o
 df_train = pd.read_csv('/Users/vmatsiiako/Desktop/Erasmus/Thesis/Code/prob1.txt_outputs_fin_train_service', delimiter=" ", header=None)
 # df_categories_train = pd.read_csv('/Users/vmatsiiako/Desktop/Erasmus/Thesis/Code/data/programGeneratedData/categories_train_2016.csv', delimiter=",").drop(columns=['Unnamed: 0'])
 
+# If you need to estimate the false/true prediction rates
 # calculate_classifications(np.asarray(df_train)[:, 0], np.asarray(df_train)[:, 1], np.asarray(df_train)[:, np.r_[2:5]])
 
 df_test_all = pd.read_csv('/Users/vmatsiiako/Desktop/Erasmus/Thesis/Code/prob1.txt_outputs_fin_test', delimiter=" ", header=None)
@@ -25,6 +23,7 @@ df_restaurant_test = df_test_all[df_categories_test["Category"] == "SERVICE#GENE
 df_test_all = df_restaurant_test
 # calculate_classifications(np.asarray(df_test_all)[:, 0], np.asarray(df_test_all)[:, 1], np.asarray(df_test_all)[:, np.r_[2:5]])
 
+# generate 2 equal test sets from different sources (for QuaNet and EntQuaNet vs all the other methods)
 data = []
 quantifications = []
 additional_data = []
@@ -34,7 +33,6 @@ for i in range(DATASET_NUMBER):
     additional_data.append(np.asarray(calculate_classifications(data[i][:, 0], data[i][:, 1], data[i][:, np.r_[2:5]])).reshape(1, 21))
     length = len(data[i])
     quantifications.append([np.count_nonzero(data[i][:, 0] == 0) / length, np.count_nonzero(data[i][:, 0] == 1) / length, np.count_nonzero(data[i][:, 0] == 2) / length])
-    # data[i] = data[i][:, np.r_[2:2405]]
     data[i] = np.c_[data[i], - data[i][:, 2]*np.log(data[i][:, 2]) - data[i][:, 3]*np.log(data[i][:, 3]) - data[i][:, 4]*np.log(data[i][:, 4])]
     # Choose depending on what you want to sort: 0 - probability, 2405 - entropy
     data[i] = data[i][data[i][:, 2405].argsort()]
@@ -49,7 +47,6 @@ for i in range(DATASET_NUMBER):
     additional_data_all.append(np.asarray(calculate_classifications(data_all[i][:, 0], data_all[i][:, 1], data_all[i][:, np.r_[2:5]])).reshape(1, 21))
     length = len(data_all[i])
     quantifications_all.append([np.count_nonzero(data_all[i][:, 0] == 0) / length, np.count_nonzero(data_all[i][:, 0] == 1) / length, np.count_nonzero(data_all[i][:, 0] == 2) / length])
-    # data[i] = data[i][:, np.r_[2:2405]]
     data_all[i] = np.c_[data_all[i], - data_all[i][:, 2]*np.log(data_all[i][:, 2]) - data_all[i][:, 3]*np.log(data_all[i][:, 3]) - data_all[i][:, 4]*np.log(data_all[i][:, 4])]
     # Choose depending on what you want to sort: 0 - probability, 2405 - entropy
     data_all[i] = data_all[i][data_all[i][:, 2405].argsort()]
@@ -60,6 +57,7 @@ additional_data_all = np.asarray(additional_data_all)
 quantifications_all = np.asarray(quantifications_all)
 
 
+# a function to calculate AE, KLD, and RAE
 def calculate_losses(quantifications, real):
     ae = np.sum(np.abs(quantifications - real))/3
     rae = np.sum(np.abs(quantifications - real)/(real+0.0001))/3
@@ -68,6 +66,7 @@ def calculate_losses(quantifications, real):
     return [ae, rae, kld]
 
 
+# 2 different clipping procedures, only the first one is used in the thesis.
 def clip(values):
     if np.min(values) < 0:
         values = values - np.min(values)
@@ -82,6 +81,7 @@ def clip2(values):
     return values
 
 
+# CC, ACC, PCC, PACC, AspEntQuaNet
 results_cc = pd.DataFrame(columns=['AE', 'RAE', 'KLD'])
 results_pcc = pd.DataFrame(columns=['AE', 'RAE', 'KLD'])
 results_acc = pd.DataFrame(columns=['AE', 'RAE', 'KLD'])
@@ -95,15 +95,16 @@ model = tf.keras.models.load_model('service_padding60_correct_2016_epoch3_entrop
 # ambience_padding30_correct_2016_epoch4_entropy_4000_4layers_batch32_1
 # restaurant_padding30_correct_2016_epoch3_entropy_2200_4layers_batch16_new
 for i in range(DATASET_NUMBER):
+    # first the classification methods
     results = calculate_classifications(data[i][:, 0], data[i][:, 1], data[i][:, np.r_[2:5]])[9:]
     results_cc = results_cc.append(pd.Series(calculate_losses(np.asarray(results[0:3]), np.asarray(quantifications[i])), index = results_cc.columns), ignore_index=True)
     results_pcc = results_pcc.append(pd.Series(calculate_losses(np.asarray(results[3:6]), np.asarray(quantifications[i])), index = results_pcc.columns), ignore_index=True)
     results_acc = results_acc.append(pd.Series(calculate_losses(clip(np.asarray(results[6:9])), np.asarray(quantifications[i])), index = results_acc.columns), ignore_index=True)
     results_pacc = results_pacc.append(pd.Series(calculate_losses(clip(np.asarray(results[9:12])), np.asarray(quantifications[i])), index = results_pacc.columns), ignore_index=True)
-    a = model.predict([np.expand_dims(data[i][:, np.r_[2:2406]], 0), additional_data[i]])[0]
-    b = calculate_losses(a, np.asarray(quantifications[i]))
-    results_aspquanet = results_aspquanet.append(pd.Series(b, index=results_aspquanet.columns), ignore_index=True)
+    # then generate the AspEntQuaNet results
+    results_aspquanet = results_aspquanet.append(pd.Series(calculate_losses(model.predict([np.expand_dims(data[i][:, np.r_[2:2406]], 0), additional_data[i]])[0], np.asarray(quantifications[i])), index=results_aspquanet.columns), ignore_index=True)
 
+# EntQuaNet
 model = tf.keras.models.load_model('allservice_padding60_correct_2016_epoch5_entropy_4000_4layers_batch16_3')
 # allfood_padding150_correct_2016_epoch10_entropy_5000_4layers_batch32_1
 # allservice_padding60_correct_2016_epoch5_entropy_4000_4layers_batch16_3
@@ -117,6 +118,7 @@ for i in range(DATASET_NUMBER):
     data_all[i] = data_all[i][data_all[i][:, 1].argsort()]
     print(i)
 
+# QuaNet
 model = tf.keras.models.load_model('allservice_padding60_correct_2016_epoch5_firstprob_5000_4layers_batch32_1')
 # allfood_padding150_correct_2016_epoch1_firstprob_5000_3layers_batch32_2
 # allservice_padding60_correct_2016_epoch5_firstprob_5000_4layers_batch32_1
@@ -127,6 +129,7 @@ for i in range(DATASET_NUMBER):
     results_quanet = results_quanet.append(pd.Series(calculate_losses(model.predict([np.expand_dims(data_all[i][:, np.r_[2:2406]], 0), additional_data_all[i]])[0], np.asarray(quantifications_all[i])), index=results_quanet.columns), ignore_index=True)
 
 
+# Average out the results
 results_cc = results_cc.mean()
 results_acc = results_acc.mean()
 results_pcc = results_pcc.mean()
@@ -144,4 +147,4 @@ results_losses["QuaNet Entropy"] = results_quanet_entropy
 results_losses["AspQuaNet"] = results_aspquanet
 
 
-model = tf.keras.models.load_model('all_data_2016_epoch10_food_adam')
+print("Stop")
